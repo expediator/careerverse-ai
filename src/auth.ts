@@ -4,6 +4,8 @@ import GoogleProvider from "next-auth/providers/google"
 import GitHubProvider from "next-auth/providers/github"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { db } from "@/lib/db"
+import { sendEmail } from "@/lib/email"
+import { welcomeEmail } from "@/lib/email-templates"
 import bcrypt from "bcryptjs"
 import { z } from "zod"
 
@@ -67,9 +69,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     async createUser({ user }) {
       if (user.id) {
-        await db.userProfile.create({
-          data: { userId: user.id },
-        })
+        await db.userProfile.create({ data: { userId: user.id } })
+      }
+      if (user.email) {
+        sendEmail({
+          to: user.email,
+          subject: "Welcome to CareerVerse AI 🎓",
+          html: welcomeEmail({ name: user.name?.split(" ")[0] ?? "" }),
+        }).catch(() => {})
       }
     },
   },
