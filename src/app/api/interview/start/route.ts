@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
-import Anthropic from "@anthropic-ai/sdk"
+import Groq from "groq-sdk"
 import { z } from "zod"
 
 const schema = z.object({
@@ -40,31 +40,23 @@ export async function POST(req: NextRequest) {
 
     let firstQuestion = OPENING_QUESTIONS[type] ?? OPENING_QUESTIONS.hr
 
-    if (process.env.ANTHROPIC_API_KEY) {
+    if (process.env.GROQ_API_KEY) {
       try {
-        const client = new Anthropic()
-        const prompt = `You are a professional ${type} interviewer${domain ? ` specializing in ${domain}` : ""}.
-Generate a warm, professional opening question for a ${difficulty} level ${type} interview${domain ? ` for ${domain} role` : ""}.
-The question should make the candidate comfortable while starting the assessment.
-Return ONLY the question text, nothing else.`
-
-        const msg = await client.messages.create({
-          model: "claude-haiku-4-5-20251001",
+        const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
+        const completion = await client.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
           max_tokens: 200,
-          messages: [{ role: "user", content: prompt }],
+          messages: [{
+            role: "user",
+            content: `You are a professional ${type} interviewer${domain ? ` specializing in ${domain}` : ""}. Generate a warm, professional opening question for a ${difficulty} level ${type} interview${domain ? ` for ${domain} role` : ""}. The question should make the candidate comfortable while starting the assessment. Return ONLY the question text, nothing else.`
+          }],
         })
-        if (msg.content[0].type === "text") {
-          firstQuestion = msg.content[0].text.trim()
-        }
+        const text = completion.choices[0].message.content?.trim()
+        if (text) firstQuestion = text
       } catch {}
     }
 
-    return NextResponse.json({
-      sessionId: interview.id,
-      firstQuestion,
-      type,
-      domain,
-    })
+    return NextResponse.json({ sessionId: interview.id, firstQuestion, type, domain })
   } catch (err) {
     console.error("[INTERVIEW_START]", err)
     return NextResponse.json({ error: "Failed to start interview" }, { status: 500 })

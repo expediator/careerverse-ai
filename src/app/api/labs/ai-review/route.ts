@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
-import Anthropic from "@anthropic-ai/sdk"
+import Groq from "groq-sdk"
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,13 +9,13 @@ export async function POST(req: NextRequest) {
 
     const { code, language, problem } = await req.json()
 
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return NextResponse.json({ review: "Add ANTHROPIC_API_KEY to your .env.local to enable AI code review." })
+    if (!process.env.GROQ_API_KEY) {
+      return NextResponse.json({ review: "Add GROQ_API_KEY to your environment variables to enable AI code review. Get it free at console.groq.com" })
     }
 
-    const client = new Anthropic()
-    const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
+    const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
+    const completion = await client.chat.completions.create({
+      model: "llama-3.1-8b-instant",
       max_tokens: 800,
       messages: [{
         role: "user",
@@ -36,8 +36,8 @@ Be concise and actionable. Max 200 words.`
       }],
     })
 
-    const content = msg.content[0]
-    return NextResponse.json({ review: content.type === "text" ? content.text : "Could not generate review." })
+    const text = completion.choices[0].message.content ?? "Could not generate review."
+    return NextResponse.json({ review: text })
   } catch (err) {
     console.error("[AI_REVIEW]", err)
     return NextResponse.json({ review: "Failed to get AI review." }, { status: 500 })

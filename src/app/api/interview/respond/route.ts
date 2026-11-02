@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { db } from "@/lib/db"
-import Anthropic from "@anthropic-ai/sdk"
+import Groq from "groq-sdk"
 import { z } from "zod"
 
 const schema = z.object({
@@ -30,9 +30,9 @@ export async function POST(req: NextRequest) {
       let feedback = "Good interview! You demonstrated reasonable communication skills. Focus on providing more specific examples with measurable outcomes in your answers."
       let closingMessage = "Thank you for the interview! You've answered all our questions. I'll now calculate your score and provide feedback."
 
-      if (process.env.ANTHROPIC_API_KEY) {
+      if (process.env.GROQ_API_KEY) {
         try {
-          const client = new Anthropic()
+          const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
           const evalPrompt = `You are evaluating a ${type} interview${domain ? ` for ${domain} role` : ""}.
 Based on this interview conversation, provide:
 1. A score from 0-100 based on: answer quality, relevance, communication clarity, and depth
@@ -44,20 +44,19 @@ ${history.map(m => `${m.role === "interviewer" ? "Interviewer" : "Candidate"}: $
 
 Return JSON only: {"score": number, "feedback": "...", "closingMessage": "..."}`
 
-          const msg = await client.messages.create({
-            model: "claude-haiku-4-5-20251001",
+          const completion = await client.chat.completions.create({
+            model: "llama-3.3-70b-versatile",
             max_tokens: 600,
             messages: [{ role: "user", content: evalPrompt }],
           })
 
-          if (msg.content[0].type === "text") {
-            const jsonMatch = msg.content[0].text.match(/\{[\s\S]*\}/)
-            if (jsonMatch) {
-              const result = JSON.parse(jsonMatch[0])
-              score = result.score ?? score
-              feedback = result.feedback ?? feedback
-              closingMessage = result.closingMessage ?? closingMessage
-            }
+          const text = completion.choices[0].message.content ?? ""
+          const jsonMatch = text.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            const result = JSON.parse(jsonMatch[0])
+            score = result.score ?? score
+            feedback = result.feedback ?? feedback
+            closingMessage = result.closingMessage ?? closingMessage
           }
         } catch {}
       }
@@ -76,34 +75,28 @@ Return JSON only: {"score": number, "feedback": "...", "closingMessage": "..."}`
 
     let nextQuestion = `Great answer! Now, tell me about a time when you faced a significant challenge at work or college. How did you handle it, and what was the outcome?`
 
-    if (process.env.ANTHROPIC_API_KEY) {
+    if (process.env.GROQ_API_KEY) {
       try {
-        const client = new Anthropic()
+        const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
         const messages = history.map(m => ({
           role: (m.role === "interviewer" ? "assistant" : "user") as "user" | "assistant",
           content: m.content,
         }))
 
-        const systemPrompt = `You are a professional ${type} interviewer${domain ? ` for ${domain} roles` : ""}.
-Your job is to conduct a realistic, conversational interview.
-- Ask ONE follow-up question based on the candidate's last answer
-- The question should either dig deeper into their answer OR smoothly transition to a new relevant topic
-- Keep questions concise (1-2 sentences max)
-- Be professional but encouraging
-- Vary question types: behavioral (STAR), situational, technical (if ${type === "technical"}), knowledge-based
-- Question ${questionNumber} of ${MAX_QUESTIONS}
-Return ONLY the next question, no preamble.`
-
-        const msg = await client.messages.create({
-          model: "claude-haiku-4-5-20251001",
+        const completion = await client.chat.completions.create({
+          model: "llama-3.3-70b-versatile",
           max_tokens: 200,
-          system: systemPrompt,
-          messages,
+          messages: [
+            {
+              role: "system",
+              content: `You are a professional ${type} interviewer${domain ? ` for ${domain} roles` : ""}. Ask ONE follow-up question based on the candidate's last answer. Either dig deeper OR smoothly transition to a new relevant topic. Keep it concise (1-2 sentences). Be professional but encouraging. Vary question types: behavioral (STAR), situational, technical (if ${type === "technical"}), knowledge-based. Question ${questionNumber} of ${MAX_QUESTIONS}. Return ONLY the question, no preamble.`,
+            },
+            ...messages,
+          ],
         })
 
-        if (msg.content[0].type === "text") {
-          nextQuestion = msg.content[0].text.trim()
-        }
+        const text = completion.choices[0].message.content?.trim()
+        if (text) nextQuestion = text
       } catch {}
     }
 

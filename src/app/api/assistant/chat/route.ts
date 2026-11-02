@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
-import Anthropic from "@anthropic-ai/sdk"
+import Groq from "groq-sdk"
 import { z } from "zod"
 
 const schema = z.object({
@@ -13,7 +13,6 @@ const schema = z.object({
 
 const SYSTEM_PROMPTS: Record<string, string> = {
   default: `You are CareerVerse AI's expert learning assistant, helping students and professionals prepare for interviews, placements, and career development. You adapt your explanations to the user's level.
-
 Your capabilities:
 - Explain technical and non-technical concepts clearly
 - Solve aptitude problems step-by-step
@@ -21,7 +20,6 @@ Your capabilities:
 - Review and debug code
 - Create personalized study plans
 - Give career guidance
-
 Guidelines:
 - Be concise but thorough
 - Use examples and analogies
@@ -60,23 +58,23 @@ export async function POST(req: NextRequest) {
 
     const { messages, mode } = parsed.data
 
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!process.env.GROQ_API_KEY) {
       return NextResponse.json({
-        content: "AI assistant requires an ANTHROPIC_API_KEY to be set in your environment variables. Please add it to your .env.local file and restart the server.\n\nGet your API key from: https://console.anthropic.com"
+        content: "AI assistant requires a GROQ_API_KEY. Get your free key at console.groq.com and add it to your environment variables."
       })
     }
 
-    const client = new Anthropic()
+    const client = new Groq({ apiKey: process.env.GROQ_API_KEY })
     const systemPrompt = SYSTEM_PROMPTS[mode] ?? SYSTEM_PROMPTS.default
 
-    const stream = client.messages.stream({
-      model: "claude-haiku-4-5-20251001",
+    const stream = await client.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
       max_tokens: 2048,
-      system: systemPrompt,
-      messages: messages.map(m => ({
-        role: m.role,
-        content: m.content,
-      })),
+      stream: true,
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...messages.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
+      ],
     })
 
     const encoder = new TextEncoder()
@@ -84,8 +82,9 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         try {
           for await (const chunk of stream) {
-            if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-              const data = JSON.stringify({ delta: { text: chunk.delta.text } })
+            const text = chunk.choices[0]?.delta?.content ?? ""
+            if (text) {
+              const data = JSON.stringify({ text })
               controller.enqueue(encoder.encode(`data: ${data}\n\n`))
             }
           }
