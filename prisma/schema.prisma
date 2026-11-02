@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  profile       UserProfile?
+  aptitudeTests AptitudeTest[]
+  interviews    Interview[]
+  resumeUploads ResumeUpload[]
+  progressData  UserProgress[]
+  notifications Notification[]
+  studyGoal     StudyGoal?
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model UserProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  college            String?
+  degree             String?
+  branch             String?
+  graduationYear     Int?
+  experienceLevel    String   @default("student")
+  skills             String[]
+  interests          String[]
+  targetRoles        String[]
+  domains            String[]
+  linkedinUrl        String?
+  githubUrl          String?
+  portfolioUrl       String?
+  bio                String?
+  onboardingComplete Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StudyGoal {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  hoursPerDay  Float    @default(2)
+  daysPerWeek  Int      @default(5)
+  targetDate   DateTime?
+  focusAreas   String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AptitudeTest {
+  id            String   @id @default(cuid())
+  userId        String
+  category      String
+  subcategory   String?
+  difficulty    String
+  totalQuestions Int
+  attempted     Int
+  correct       Int
+  timeTaken     Int
+  score         Float
+  completedAt   DateTime @default(now())
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions AptitudeQuestion[]
+}
+
+model AptitudeQuestion {
+  id          String   @id @default(cuid())
+  testId      String
+  question    String   @db.Text
+  options     String[]
+  correctAnswer String
+  userAnswer  String?
+  isCorrect   Boolean?
+  timeTaken   Int?
+  explanation String?  @db.Text
+
+  test AptitudeTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+}
+
+model Interview {
+  id           String   @id @default(cuid())
+  userId       String
+  type         String
+  domain       String?
+  difficulty   String
+  status       String   @default("pending")
+  overallScore Float?
+  duration     Int?
+  feedback     String?  @db.Text
+  createdAt    DateTime @default(now())
+  completedAt  DateTime?
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions InterviewQuestion[]
+}
+
+model InterviewQuestion {
+  id              String   @id @default(cuid())
+  interviewId     String
+  question        String   @db.Text
+  userAnswer      String?  @db.Text
+  aiEvaluation    String?  @db.Text
+  score           Float?
+  suggestedAnswer String?  @db.Text
+  followUps       String[]
+  timestamp       Int?
+
+  interview Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+}
+
+model ResumeUpload {
+  id           String   @id @default(cuid())
+  userId       String
+  fileName     String
+  fileUrl      String
+  parsedData   Json?
+  atsScore     Float?
+  feedback     String?  @db.Text
+  extractedSkills String[]
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UserProgress {
+  id         String   @id @default(cuid())
+  userId     String
+  module     String
+  subModule  String?
+  score      Float
+  details    Json?
+  recordedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("info")
+  isRead    Boolean  @default(false)
+  actionUrl String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
