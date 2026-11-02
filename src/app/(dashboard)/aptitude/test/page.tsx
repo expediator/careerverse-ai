@@ -50,7 +50,7 @@ export default function AptitudeTestPage() {
       const res = await fetch("/api/aptitude/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, difficulty, topic, count: 15 }),
+        body: JSON.stringify({ category, difficulty, topic: topic ?? undefined, count: 15 }),
       })
       const data = await res.json()
       setState(s => ({

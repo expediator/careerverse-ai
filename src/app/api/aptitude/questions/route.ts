@@ -6,7 +6,7 @@ import { z } from "zod"
 const schema = z.object({
   category: z.enum(["quantitative", "logical", "verbal", "mixed"]),
   difficulty: z.enum(["beginner", "intermediate", "advanced"]),
-  topic: z.string().optional(),
+  topic: z.string().nullish(),
   count: z.number().min(5).max(30).default(15),
   company: z.string().optional(),
 })
