@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Brain, Code2, Mic2, BookOpen, BarChart3,
   FlaskConical, FileText, Target, Settings, User,
   Zap, ChevronRight, GraduationCap, Briefcase, TrendingUp,
-  Shield, Cpu, Beaker
+  Shield, Cpu, Beaker, Gauge
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
@@ -30,6 +30,7 @@ const NAV_SECTIONS = [
     title: "Preparation",
     items: [
       { href: "/aptitude", icon: BarChart3, label: "Aptitude" },
+      { href: "/skills", icon: Gauge, label: "Skill Check" },
       { href: "/interview", icon: Mic2, label: "AI Interview" },
       { href: "/personality", icon: Brain, label: "Communication" },
       { href: "/resume", icon: FileText, label: "Resume" },
