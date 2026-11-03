@@ -78,6 +78,7 @@ export default function AptitudeTestPage() {
   const [currentTaunt, setCurrentTaunt] = useState("")
   const [xp, setXp] = useState(0)
   const [streak, setStreak] = useState(0)
+  const [apiXp, setApiXp] = useState<number | null>(null)
   const prevAnsweredRef = useRef(0)
 
   const loadQuestions = useCallback(async () => {
@@ -188,7 +189,7 @@ export default function AptitudeTestPage() {
         score,
         timeTaken: (1800 - s.timeLeft),
       }),
-    }).catch(() => {})
+    }).then(r => r.json()).then(d => { if (typeof d.xpEarned === "number") setApiXp(d.xpEarned) }).catch(() => {})
   }
 
   function submitTest() {
@@ -229,7 +230,7 @@ export default function AptitudeTestPage() {
   if (result) {
     const achievement = ACHIEVEMENTS.find(a => result.score >= a.threshold)!
     const bonusXp = Math.round(result.score / 10) * 5
-    const finalXp = xp + bonusXp
+    const finalXp = apiXp ?? (xp + bonusXp)
     const q = state.questions
 
     return (

@@ -9,8 +9,9 @@ import { cn } from "@/lib/utils"
 import {
   Clock, ChevronLeft, ChevronRight, Flag, CheckCircle2, XCircle,
   AlertCircle, Loader2, Flame, Zap, ArrowLeft, RotateCcw, BookOpen,
-  ExternalLink, Brain, Code2, Trophy, Star,
+  ExternalLink, Brain, Code2, Trophy, Star, Layers,
 } from "lucide-react"
+import { SKILL_LEVELS } from "@/lib/skill-levels"
 
 const DOMAIN_META: Record<string, { label: string; icon: string; color: string }> = {
   dsa:           { label: "DSA",              icon: "🌲", color: "text-indigo-400" },
@@ -56,6 +57,8 @@ interface SkillResult {
   color: string
   description: string
   score: number
+  xpEarned?: number
+  difficultyLevel?: string
   weakAreas: string[]
   strongAreas: string[]
   resources: Array<{ title: string; url: string; type: string; why: string }>
@@ -80,10 +83,13 @@ export default function SkillAssessPage() {
   const [quitTaunt, setQuitTaunt] = useState("")
   const [xp, setXp] = useState(0)
   const [streak, setStreak] = useState(0)
+  const [phase, setPhase] = useState<"pick" | "quiz">("pick")
+  const [selectedLevel, setSelectedLevel] = useState("Novice")
   const prevAnsweredRef = useRef(0)
 
-  const loadQuestions = useCallback(async () => {
+  const loadQuestions = useCallback(async (level: string) => {
     setLoading(true)
+    setPhase("quiz")
     setAnswers({})
     setMarked(new Set())
     setCurrent(0)
@@ -95,7 +101,7 @@ export default function SkillAssessPage() {
       const res = await fetch("/api/skills/questions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain, type: "mixed", count: 15 }),
+        body: JSON.stringify({ domain, type: "mixed", count: 15, level }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
@@ -107,8 +113,6 @@ export default function SkillAssessPage() {
       setLoading(false)
     }
   }, [domain])
-
-  useEffect(() => { loadQuestions() }, [loadQuestions])
 
   // XP + streak
   useEffect(() => {
@@ -154,6 +158,7 @@ export default function SkillAssessPage() {
         body: JSON.stringify({
           domain,
           score,
+          level: selectedLevel,
           questions: questions.map((q, i) => ({
             question: q.question,
             type: q.type,
@@ -170,11 +175,11 @@ export default function SkillAssessPage() {
         setResult(data)
       } else {
         // Fallback local result
-        const level = score >= 91 ? "Expert" : score >= 76 ? "Advanced" : score >= 61 ? "Intermediate" : score >= 41 ? "Elementary" : "Beginner"
+        const level = score >= 88 ? "Super Expert" : score >= 76 ? "Expert" : score >= 63 ? "Intermediate" : score >= 51 ? "Skilled" : score >= 38 ? "Novice" : score >= 26 ? "Rookie" : score >= 13 ? "Beginner" : "New"
         setResult({ level, emoji: "📊", color: "text-indigo-400", description: "", score, weakAreas: [], strongAreas: [], resources: [], aiPlan: null })
       }
     } catch {
-      const level = score >= 91 ? "Expert" : score >= 76 ? "Advanced" : score >= 61 ? "Intermediate" : score >= 41 ? "Elementary" : "Beginner"
+      const level = score >= 88 ? "Super Expert" : score >= 76 ? "Expert" : score >= 63 ? "Intermediate" : score >= 51 ? "Skilled" : score >= 38 ? "Novice" : score >= 26 ? "Rookie" : score >= 13 ? "Beginner" : "New"
       setResult({ level, emoji: "📊", color: "text-indigo-400", description: "", score, weakAreas: [], strongAreas: [], resources: [], aiPlan: null })
     }
   }
@@ -187,10 +192,78 @@ export default function SkillAssessPage() {
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`
 
+  // Difficulty picker screen
+  if (phase === "pick") {
+    const orderedLevels = [...SKILL_LEVELS].reverse() // New → Super Expert
+    const pickedLvl = orderedLevels.find(l => l.label === selectedLevel) ?? orderedLevels[3]
+    return (
+      <div className="max-w-2xl mx-auto space-y-8">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-2xl">{meta.icon}</span>
+            <h1 className="text-2xl font-bold text-zinc-100">{meta.label} Assessment</h1>
+          </div>
+          <p className="text-zinc-400 text-sm">
+            Choose a difficulty level. Questions are generated at that level.
+            Higher difficulty = harder questions + more XP per correct answer.
+          </p>
+        </div>
+
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-4">
+            <Layers className="w-3.5 h-3.5" />Select Difficulty Level
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {orderedLevels.map(lvl => (
+              <button
+                key={lvl.label}
+                onClick={() => setSelectedLevel(lvl.label)}
+                className={cn(
+                  "rounded-xl border p-4 text-left transition-all",
+                  selectedLevel === lvl.label
+                    ? `${lvl.border} ${lvl.bg}`
+                    : "border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900"
+                )}
+              >
+                <div className="text-xl mb-2">{lvl.emoji}</div>
+                <p className={`text-sm font-semibold mb-1 ${selectedLevel === lvl.label ? lvl.color : "text-zinc-300"}`}>{lvl.label}</p>
+                <p className={`text-xs font-mono ${selectedLevel === lvl.label ? lvl.color : "text-zinc-600"}`}>{lvl.scoreRange}</p>
+                <p className="text-xs text-zinc-500 mt-1.5">+{lvl.xpPerCorrect} XP/correct</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Selected level info */}
+        <div className={`rounded-xl border ${pickedLvl.border} ${pickedLvl.bg} p-5`}>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <p className="text-sm font-semibold text-zinc-100 mb-1">{pickedLvl.emoji} {pickedLvl.label} Difficulty</p>
+              <p className="text-xs text-zinc-400 leading-relaxed max-w-sm">{pickedLvl.description}</p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className={`text-lg font-bold ${pickedLvl.color}`}>+{pickedLvl.xpPerCorrect * 15} XP</p>
+              <p className="text-xs text-zinc-500">max per test (15/15)</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <Button size="lg" onClick={() => loadQuestions(selectedLevel)} className="flex-1 gap-2">
+            <Zap className="w-4 h-4" />Start {selectedLevel} Assessment
+          </Button>
+          <Button size="lg" variant="outline" onClick={() => router.push("/skills")}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-96 gap-4">
       <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
-      <p className="text-zinc-400">Generating your skill assessment...</p>
+      <p className="text-zinc-400">Generating {selectedLevel} difficulty questions...</p>
       <p className="text-xs text-zinc-600">{meta.icon} {meta.label} · 15 questions · Quiz + Theory + Practical</p>
     </div>
   )
@@ -200,7 +273,8 @@ export default function SkillAssessPage() {
       <AlertCircle className="w-8 h-8 text-amber-400" />
       <p className="text-zinc-300 font-medium">Could not load questions</p>
       <div className="flex gap-3">
-        <Button onClick={loadQuestions}>Retry</Button>
+        <Button onClick={() => loadQuestions(selectedLevel)}>Retry</Button>
+        <Button variant="outline" onClick={() => setPhase("pick")}>Change Difficulty</Button>
         <Button variant="outline" onClick={() => router.push("/skills")}>Back</Button>
       </div>
     </div>
@@ -210,11 +284,14 @@ export default function SkillAssessPage() {
   if (result) {
     const correct = questions.filter((q, i) => answers[i] === q.correctAnswer).length
     const LEVEL_BADGES: Record<string, string> = {
-      Expert: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-      Advanced: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
-      Intermediate: "bg-sky-500/15 text-sky-400 border-sky-500/30",
-      Elementary: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-      Beginner: "bg-violet-500/15 text-violet-400 border-violet-500/30",
+      "Super Expert": "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
+      "Expert":       "bg-amber-500/15 text-amber-400 border-amber-500/30",
+      "Intermediate": "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
+      "Skilled":      "bg-sky-500/15 text-sky-400 border-sky-500/30",
+      "Novice":       "bg-teal-500/15 text-teal-400 border-teal-500/30",
+      "Rookie":       "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
+      "Beginner":     "bg-slate-500/15 text-slate-400 border-slate-500/30",
+      "New":          "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
     }
 
     return (
@@ -229,11 +306,11 @@ export default function SkillAssessPage() {
             {meta.icon} {result.level}
           </Badge>
           <p className="text-zinc-400 text-sm mt-2 max-w-sm mx-auto">{result.description}</p>
-          <p className="text-zinc-500 text-sm mt-1">{correct}/{questions.length} correct</p>
+          <p className="text-zinc-500 text-sm mt-1">{correct}/{questions.length} correct · <span className="text-zinc-600">{result.difficultyLevel ?? selectedLevel} difficulty</span></p>
 
           <div className="flex items-center justify-center gap-6 mt-6">
             <div className="text-center">
-              <div className="text-2xl font-bold text-amber-400 flex items-center gap-1 justify-center"><Zap className="w-5 h-5" />{xp + Math.round(result.score / 10) * 5}</div>
+              <div className="text-2xl font-bold text-amber-400 flex items-center gap-1 justify-center"><Zap className="w-5 h-5" />{result.xpEarned ?? (xp + Math.round(result.score / 10) * 5)}</div>
               <div className="text-xs text-zinc-500">XP Earned</div>
             </div>
             <div className="text-center">
@@ -243,7 +320,7 @@ export default function SkillAssessPage() {
           </div>
 
           <div className="flex gap-3 justify-center mt-8">
-            <Button onClick={loadQuestions} className="gap-2"><RotateCcw className="w-4 h-4" />Retake</Button>
+            <Button onClick={() => { setPhase("pick"); setSubmitted(false); setResult(null) }} className="gap-2"><RotateCcw className="w-4 h-4" />Try Different Level</Button>
             <Button variant="outline" onClick={() => router.push("/skills")} className="gap-2"><ArrowLeft className="w-4 h-4" />All Domains</Button>
           </div>
         </div>
@@ -390,6 +467,7 @@ export default function SkillAssessPage() {
           </button>
           <span className="text-lg">{meta.icon}</span>
           <Badge variant="secondary" className={`${meta.color}`}>{meta.label}</Badge>
+          <Badge variant="outline" className="text-xs text-zinc-500 hidden sm:inline-flex">{selectedLevel}</Badge>
           <span className="text-sm text-zinc-500 hidden sm:inline">{answered}/{questions.length} answered</span>
         </div>
         <div className="flex items-center gap-3">

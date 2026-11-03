@@ -16,6 +16,16 @@ const schema = z.object({
   })),
 })
 
+const XP_PER_CORRECT: Record<string, number> = {
+  beginner: 5,
+  easy:     5,
+  intermediate: 12,
+  medium:   12,
+  advanced: 20,
+  hard:     20,
+  expert:   30,
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await auth()
@@ -27,6 +37,7 @@ export async function POST(req: NextRequest) {
 
     const { category, difficulty, score, timeTaken, questions } = parsed.data
     const correct = questions.filter(q => q.userAnswer === q.correctAnswer).length
+    const xpEarned = correct * (XP_PER_CORRECT[difficulty.toLowerCase()] ?? 10)
 
     const test = await db.aptitudeTest.create({
       data: {
@@ -57,10 +68,18 @@ export async function POST(req: NextRequest) {
         module: "aptitude",
         subModule: category,
         score,
+        details: {
+          category,
+          difficulty,
+          correct,
+          total: questions.length,
+          xpEarned,
+          timeTaken,
+        },
       },
     })
 
-    return NextResponse.json({ testId: test.id, score, correct })
+    return NextResponse.json({ testId: test.id, score, correct, xpEarned })
   } catch (err) {
     console.error("[APTITUDE_SUBMIT]", err)
     return NextResponse.json({ error: "Failed to save test" }, { status: 500 })

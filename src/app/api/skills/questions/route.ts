@@ -6,7 +6,19 @@ const schema = z.object({
   domain: z.enum(["dsa", "web", "database", "python", "system-design", "data-science", "cybersecurity", "os"]),
   type: z.enum(["theoretical", "quiz", "practical", "mixed"]).default("mixed"),
   count: z.number().min(5).max(20).default(15),
+  level: z.string().default("Novice"),
 })
+
+const DIFFICULTY_PROMPTS: Record<string, string> = {
+  "New":          "VERY EASY — absolute basics only. Someone who has never studied this topic should know most answers from common knowledge or a single intro video.",
+  "Beginner":     "EASY — foundational definitions and simple examples. Someone who has done 1–2 tutorials should get most right.",
+  "Rookie":       "EASY-MEDIUM — tests whether the person knows the basics well and has started applying them in simple projects.",
+  "Novice":       "MEDIUM — core knowledge a serious learner would know. Requires some study time and practice.",
+  "Skilled":      "MEDIUM-HARD — requires hands-on experience. Goes beyond theory into applied understanding.",
+  "Intermediate": "HARD — requires solid knowledge, pattern recognition, and independent problem-solving ability.",
+  "Expert":       "VERY HARD — deep knowledge, edge cases, non-obvious tradeoffs. Only those with real experience will score well.",
+  "Super Expert": "EXTREMELY HARD — mastery-level. Advanced internals, research-level concepts, or architectural reasoning under constraints.",
+}
 
 // Fallback questions per domain (5 each, covering theory + quiz + practical)
 const FALLBACK: Record<string, Array<{ id: string; question: string; options: string[]; correctAnswer: string; explanation: string; topic: string; type: string }>> = {
@@ -118,6 +130,7 @@ export async function POST(req: NextRequest) {
     domain = parsed.data.domain
     count = parsed.data.count
     const type = parsed.data.type
+    const level = parsed.data.level
 
     if (!process.env.GROQ_API_KEY) {
       return NextResponse.json({ questions: getFallback(domain, count), duration: count * 90 })
@@ -133,9 +146,12 @@ export async function POST(req: NextRequest) {
       ? "Code output prediction, scenario analysis, problem-solving."
       : "Mix: 5 theoretical (concepts), 5 quiz (facts/recall), 5 practical (code/scenarios)."
 
+    const difficultyInstruction = DIFFICULTY_PROMPTS[level] ?? DIFFICULTY_PROMPTS["Novice"]
+
     const prompt = `Generate ${count} skill assessment questions for ${domainLabel}.
+Difficulty level: ${level} — ${difficultyInstruction}
 ${typeInstructions}
-Questions should judge actual knowledge depth, not just surface facts.
+Questions should judge actual knowledge depth at the ${level} difficulty level, not just surface facts.
 
 Return ONLY a valid JSON array (no markdown fences):
 [{"id":"q1","type":"theoretical","question":"...","options":["A","B","C","D"],"correctAnswer":"A","explanation":"clear explanation...","topic":"subtopic"}]
@@ -144,7 +160,7 @@ type field must be one of: "theoretical", "quiz", "practical"
 Rules:
 - 4 distinct options per question
 - correctAnswer must exactly match one option
-- Difficulty: mix of easy (40%), medium (40%), hard (20%)
+- ALL questions must match the ${level} difficulty level described above
 - Cover ${count > 10 ? "breadth of subtopics" : "core subtopics"} of ${domainLabel}
 Return ONLY the JSON array.`
 

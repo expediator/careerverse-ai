@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { Gauge, ArrowRight, Trophy, Target, TrendingUp, Star, ChevronRight, Zap } from "lucide-react"
+import { Gauge, ArrowRight, Trophy, Target, TrendingUp, Star, ChevronRight, Zap, BookOpen, Layers } from "lucide-react"
+import { LEVEL_BADGE_MAP } from "@/lib/skill-levels"
 
 const DOMAINS = [
   { id: "dsa",           label: "DSA",              icon: "🌲", full: "Data Structures & Algorithms", color: "bg-indigo-500/10 border-indigo-500/20", accent: "text-indigo-400", desc: "Arrays, Trees, Graphs, DP, Sorting" },
@@ -18,13 +19,8 @@ const DOMAINS = [
   { id: "os",            label: "OS & Networks",     icon: "⚙️", full: "OS & Networking",               color: "bg-zinc-500/10 border-zinc-500/20",   accent: "text-zinc-400",   desc: "Processes, Memory, TCP/IP, Scheduling" },
 ]
 
-const LEVEL_COLORS: Record<string, string> = {
-  Expert: "text-amber-400 bg-amber-500/10 border-amber-500/30",
-  Advanced: "text-indigo-400 bg-indigo-500/10 border-indigo-500/30",
-  Intermediate: "text-sky-400 bg-sky-500/10 border-sky-500/30",
-  Elementary: "text-emerald-400 bg-emerald-500/10 border-emerald-500/30",
-  Beginner: "text-violet-400 bg-violet-500/10 border-violet-500/30",
-}
+// Badge classes from shared skill-levels lib (covers all 8 levels)
+const LEVEL_COLORS = LEVEL_BADGE_MAP
 
 export default async function SkillsPage() {
   await connection()
@@ -54,22 +50,30 @@ export default async function SkillsPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-zinc-100 flex items-center gap-2">
             <Gauge className="w-6 h-6 text-indigo-400" />
             Skill Assessment
           </h1>
           <p className="text-zinc-400 mt-1">
-            Find out exactly where you stand — quiz, theory, and practical questions per domain. Get a personalised study plan.
+            Find out exactly where you stand — 8 skill levels, quiz + theory + practical questions per domain.
           </p>
         </div>
-        <Link href="/skills/assess?domain=dsa">
-          <Button className="hidden sm:flex gap-2">
-            <Zap className="w-4 h-4" />
-            Quick Check
-          </Button>
-        </Link>
+        <div className="hidden sm:flex gap-2 shrink-0">
+          <Link href="/skills/levels">
+            <Button variant="outline" className="gap-2">
+              <Layers className="w-4 h-4" />
+              Level Guide
+            </Button>
+          </Link>
+          <Link href="/skills/assess?domain=dsa">
+            <Button className="gap-2">
+              <Zap className="w-4 h-4" />
+              Quick Check
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
@@ -135,12 +139,20 @@ export default async function SkillsPage() {
                     </div>
                   )}
 
-                  <Link href={`/skills/assess?domain=${domain.id}`} className="block">
-                    <Button size="sm" variant={result ? "outline" : "default"} className="w-full gap-1.5 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-colors">
-                      {result ? "Retake" : "Start Assessment"}
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </Button>
-                  </Link>
+                  <div className="flex gap-2">
+                    <Link href={`/skills/learn/${domain.id}`} className="flex-shrink-0">
+                      <Button size="sm" variant="ghost" className="gap-1 text-zinc-500 hover:text-zinc-300 px-2">
+                        <BookOpen className="w-3.5 h-3.5" />
+                        Learn
+                      </Button>
+                    </Link>
+                    <Link href={`/skills/assess?domain=${domain.id}`} className="flex-1">
+                      <Button size="sm" variant={result ? "outline" : "default"} className="w-full gap-1.5 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-colors">
+                        {result ? "Retake" : "Assess"}
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Button>
+                    </Link>
+                  </div>
                 </CardContent>
               </Card>
             )

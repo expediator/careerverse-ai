@@ -48,7 +48,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const valid = await bcrypt.compare(parsed.data.password, user.password)
         if (!valid) return null
 
-        return user
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          image: user.image,
+        }
       },
     }),
   ],
@@ -69,7 +74,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     async createUser({ user }) {
       if (user.id) {
-        await db.userProfile.create({ data: { userId: user.id } })
+        await db.userProfile.upsert({
+          where: { userId: user.id },
+          update: {},
+          create: { userId: user.id },
+        })
       }
       if (user.email) {
         sendEmail({
